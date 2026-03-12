@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="北海道高等学校遠隔授業配信センター対応デジタルノート">
+    <meta name="theme-color" content="#667eea">
+    <title>T-Board - 遠隔授業対応デジタルノート</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="./manifest.json">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="./icon-192.svg">
+    <link rel="apple-touch-icon" href="./icon-192.svg">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/tfab-integration.css">
+    <link rel="stylesheet" href="css/pwa-install.css">
+    <link rel="stylesheet" href="css/debug.css">
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="app-header">
+        <div class="header-left">
+            <button id="menuToggleBtn" class="menu-toggle-btn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1>
+                <i class="fas fa-chalkboard logo-icon"></i>
+                <span class="logo-text">T-Board</span>
+                <span class="version-badge">v3.0.0</span>
+            </h1>
+        </div>
+        <div class="header-right">
+            <button id="toggleLayoutBtn" class="btn btn-secondary" title="ツールバーを左/上に切替">
+                <i class="fas fa-arrow-up" id="layoutIcon"></i> <span class="btn-text">レイアウト</span>
+            </button>
+            <button id="createBlankBtn" class="btn btn-primary">
+                <i class="fas fa-file"></i> <span class="btn-text">白紙ノート</span>
+            </button>
+            <button id="loadPdfBtn" class="btn btn-primary">
+                <i class="fas fa-file-pdf"></i> <span class="btn-text">PDFを開く</span>
+            </button>
+            <input type="file" id="pdfInput" accept=".pdf,application/pdf" style="display: none;">
+        </div>
+    </header>
+
+    <!-- メインコンテナ -->
+    <div class="main-container">
+        <!-- ツールバーオーバーレイ（モバイル用） -->
+        <div class="toolbar-overlay" id="toolbarOverlay"></div>
+        
+        <!-- ツールバー -->
+        <aside class="toolbar" id="toolbar">
+            <!-- ページナビゲーション -->
+            <div class="toolbar-section">
+                <h3><i class="fas fa-book"></i> ページ</h3>
+                <div class="page-controls-sidebar">
+                    <button id="prevPageBtn" class="control-btn" disabled>
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <span class="page-info">
+                        <span id="currentPage">-</span> / <span id="totalPages">-</span>
+                    </span>
+                    <button id="nextPageBtn" class="control-btn" disabled>
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <button id="addPageBtn" class="control-btn" style="display: none;" title="ページを追加">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ズームコントロール -->
+            <div class="toolbar-section">
+                <h3><i class="fas fa-search"></i> ズーム</h3>
+                <div class="zoom-controls-sidebar">
+                    <button id="zoomOutBtn" class="control-btn" title="縮小">
+                        <i class="fas fa-search-minus"></i>
+                    </button>
+                    <button id="zoomInBtn" class="control-btn" title="拡大">
+                        <i class="fas fa-search-plus"></i>
+                    </button>
+                    <button id="resetZoomBtn" class="control-btn reset-zoom-btn-sidebar" title="100%に戻す">
+                        100%
+                    </button>
+                    <button id="fitWidthBtn" class="control-btn" title="幅に合わせる">
+                        <i class="fas fa-arrows-alt-h"></i>
+                    </button>
+                </div>
+                <!-- ズーム倍率表示（非表示のまま維持、JS用） -->
+                <span class="zoom-info" id="zoomInfo" style="display: none;">100%</span>
+            </div>
+
+            <!-- スクロールコントロール -->
+            <div class="toolbar-section">
+                <h3><i class="fas fa-arrows-alt"></i> スクロール</h3>
+                <div class="scroll-controls">
+                    <div class="scroll-row">
+                        <button id="scrollUpBtn" class="scroll-btn" title="上にスクロール">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                    </div>
+                    <div class="scroll-row">
+                        <button id="scrollLeftBtn" class="scroll-btn" title="左にスクロール">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <div class="scroll-center"></div>
+                        <button id="scrollRightBtn" class="scroll-btn" title="右にスクロール">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="scroll-row">
+                        <button id="scrollDownBtn" class="scroll-btn" title="下にスクロール">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar-section">
+                <h3><i class="fas fa-tools"></i> 描画ツール</h3>
+                <div class="tool-group">
+                    <button class="tool-btn active" data-tool="pen" title="ペン">
+                        <i class="fas fa-pen"></i>
+                        <span>ペン</span>
+                    </button>
+                    <button class="tool-btn" data-tool="marker" title="マーカー">
+                        <i class="fas fa-highlighter"></i>
+                        <span>マーカー</span>
+                    </button>
+                    <button class="tool-btn" data-tool="eraser" title="消しゴム">
+                        <i class="fas fa-eraser"></i>
+                        <span>消しゴム</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="toolbar-section">
+                <h3><i class="fas fa-palette"></i> 色</h3>
+                <div class="color-group">
+                    <button class="color-btn active" data-color="#000000" style="background: #000000;" title="黒"></button>
+                    <button class="color-btn" data-color="#FF0000" style="background: #FF0000;" title="赤"></button>
+                    <button class="color-btn" data-color="#0000FF" style="background: #0000FF;" title="青"></button>
+                    <button class="color-btn" data-color="#00AA00" style="background: #00AA00;" title="緑"></button>
+                    <button class="color-btn" data-color="#FF6600" style="background: #FF6600;" title="オレンジ"></button>
+                    <button class="color-btn" data-color="#FFFF00" style="background: #FFFF00;" title="黄色"></button>
+                    <button class="color-btn" data-color="#FF00FF" style="background: #FF00FF;" title="紫"></button>
+                    <button class="color-btn" data-color="#00FFFF" style="background: #00FFFF;" title="水色"></button>
+                </div>
+            </div>
+
+            <div class="toolbar-section">
+                <h3><i class="fas fa-sliders-h"></i> 太さ</h3>
+                <div class="thickness-group">
+                    <label for="thicknessSlider">太さ: <span id="thicknessValue">3</span>px</label>
+                    <input type="range" id="thicknessSlider" min="1" max="20" value="3">
+                </div>
+            </div>
+
+            <!-- モード切替 -->
+            <div class="toolbar-section">
+                <h3><i class="fas fa-pen-fancy"></i> モード</h3>
+                <div class="action-group">
+                    <button id="penModeBtn" class="mode-btn active" title="ペンモード：手の動きを無視してペンのみに反応します">
+                        <i class="fas fa-pen"></i>
+                        <span>ペン専用</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="toolbar-section">
+                <h3><i class="fas fa-edit"></i> アクション</h3>
+                <div class="action-group">
+                    <button class="action-btn" id="undoBtn" title="元に戻す">
+                        <i class="fas fa-undo"></i>
+                        <span>元に戻す</span>
+                    </button>
+                    <button class="action-btn" id="redoBtn" title="やり直し">
+                        <i class="fas fa-redo"></i>
+                        <span>やり直し</span>
+                    </button>
+                    <button class="action-btn" id="clearBtn" title="全消去">
+                        <i class="fas fa-trash"></i>
+                        <span>全消去</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="toolbar-section">
+                <h3><i class="fas fa-save"></i> 保存</h3>
+                <div class="action-group">
+                    <button class="action-btn" id="saveBtn" title="現在のページを画像として保存">
+                        <i class="fas fa-image"></i>
+                        <span>画像保存</span>
+                    </button>
+                    <button class="action-btn" id="savePdfBtn" title="全ページをPDFとして保存">
+                        <i class="fas fa-file-pdf"></i>
+                        <span>PDF保存</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- キャンバスエリア -->
+        <main class="canvas-area">
+            <div class="canvas-container" id="canvasContainer">
+                <div class="empty-state">
+                    <i class="fas fa-edit" style="font-size: 5rem;"></i>
+                    <h2>始めましょう</h2>
+                    <p>PDFファイルに書き込むか、白紙のノートを作成してください。</p>
+                    <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem;">
+                        <button class="btn btn-primary" onclick="document.getElementById('createBlankBtn').click()">
+                            <i class="fas fa-file"></i> 白紙ノート
+                        </button>
+                        <button class="btn btn-primary" onclick="document.getElementById('pdfInput').click()">
+                            <i class="fas fa-file-pdf"></i> PDFを開く
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- PDF.js ライブラリ -->
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    
+    <!-- jsPDF ライブラリ（PDF出力用） -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    
+    <!-- デバッグモード設定（必要な場合のみ有効化） -->
+    <script>
+        // デバッグログを有効にする場合は true に設定
+        window.enableDebugLog = false;
+    </script>
+    
+    <!-- 画面上ログ表示（デバッグモードが有効な場合のみ動作） -->
+    <script src="js/on-screen-log.js"></script>
+    
+    <script>
+        // PDF.jsが読み込まれるまで待機
+        window.addEventListener('DOMContentLoaded', function() {
+            if (typeof pdfjsLib === 'undefined') {
+                console.error('PDF.jsの読み込みに失敗しました');
+                document.getElementById('canvasContainer').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exclamation-triangle" style="color: #ff6b6b;"></i>
+                        <h2>PDF.jsライブラリの読み込みエラー</h2>
+                        <p>ページを再読み込みしてください。</p>
+                    </div>
+                `;
+            } else {
+                console.log('PDF.js読み込み成功');
+            }
+        });
+    </script>
+    <script src="js/app.js"></script>
+    <!-- T-fab Tile 連携 -->
+    <script src="js/tfab-integration.js"></script>
+    <!-- PWA インストール機能 -->
+    <script src="js/pwa-install.js"></script>
+</body>
+</html>

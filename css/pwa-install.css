@@ -1,0 +1,238 @@
+/* PWA インストール機能のスタイル */
+
+/* インストールボタン */
+.pwa-install-btn,
+.ios-install-btn {
+    animation: pulseInstall 2s ease-in-out infinite;
+}
+
+@keyframes pulseInstall {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+}
+
+/* iOS インストール手順ダイアログ */
+.pwa-ios-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+}
+
+.pwa-ios-dialog {
+    background: white;
+    border-radius: 16px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.pwa-ios-dialog .dialog-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 16px 16px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.pwa-ios-dialog .dialog-header i {
+    font-size: 1.5rem;
+}
+
+.pwa-ios-dialog .dialog-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.pwa-ios-dialog .dialog-body {
+    padding: 2rem 1.5rem;
+}
+
+.ios-instructions {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.instruction-step {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.step-number {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.step-content {
+    flex: 1;
+}
+
+.step-content p {
+    margin: 0 0 0.5rem 0;
+    color: #333;
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+.icon-example {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: #f3f4f6;
+    border-radius: 8px;
+}
+
+.icon-example i {
+    font-size: 1.8rem;
+    color: #667eea;
+}
+
+.icon-example span {
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.ios-note {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    border-radius: 8px;
+    display: flex;
+    gap: 0.75rem;
+}
+
+.ios-note i {
+    color: #3b82f6;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.ios-note p {
+    margin: 0;
+    color: #1e40af;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.pwa-ios-dialog .dialog-footer {
+    padding: 1rem 1.5rem 1.5rem;
+    display: flex;
+    justify-content: center;
+}
+
+.pwa-ios-dialog .dialog-footer .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.pwa-ios-dialog .dialog-footer .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+    .pwa-ios-dialog {
+        width: 95%;
+        max-height: 90vh;
+    }
+    
+    .pwa-ios-dialog .dialog-body {
+        padding: 1.5rem 1rem;
+    }
+    
+    .instruction-step {
+        gap: 0.75rem;
+    }
+    
+    .step-number {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    .step-content p {
+        font-size: 0.95rem;
+    }
+    
+    .icon-example i {
+        font-size: 1.5rem;
+    }
+    
+    .ios-note {
+        padding: 0.75rem;
+    }
+    
+    .ios-note p {
+        font-size: 0.9rem;
+    }
+}
+
+/* スタンドアロンモード検出（既にインストール済み） */
+@media (display-mode: standalone) {
+    .pwa-install-btn,
+    .ios-install-btn {
+        display: none !important;
+    }
+}

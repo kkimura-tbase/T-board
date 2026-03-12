@@ -1,0 +1,933 @@
+/* リセットとベーススタイル */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    overflow: hidden;
+    height: 100vh;
+}
+
+/* ヘッダー */
+.app-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.menu-toggle-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+}
+
+.header-left h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logo-icon {
+    font-size: 1.3rem;
+}
+
+.logo-text {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, #ffffff 0%, #e0e7ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.version-badge {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fbbf24;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    margin-left: 0.5rem;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    vertical-align: middle;
+    letter-spacing: 0.5px;
+}
+
+.header-right {
+    display: flex;
+    gap: 1rem;
+}
+
+/* ボタンスタイル */
+.btn {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: white;
+    color: #667eea;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+/* メインコンテナ */
+.main-container {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* 上部バーレイアウト */
+.main-container.layout-top {
+    flex-direction: column;
+}
+
+.main-container.layout-top .toolbar {
+    width: 100%;
+    height: auto;
+    max-height: 120px;
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 0.5rem 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    overflow-x: auto;
+    overflow-y: auto;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.main-container.layout-top .toolbar-section {
+    margin-bottom: 0;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.main-container.layout-top .toolbar-section h3 {
+    font-size: 0.65rem;
+    margin-bottom: 0.2rem;
+    white-space: nowrap;
+    opacity: 0.7;
+}
+
+.main-container.layout-top .tool-group,
+.main-container.layout-top .color-group,
+.main-container.layout-top .action-group {
+    display: flex;
+    flex-direction: row;
+    gap: 0.25rem;
+    flex-wrap: nowrap;
+}
+
+.main-container.layout-top .color-group {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 0.2rem;
+}
+
+.main-container.layout-top .color-btn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+}
+
+.main-container.layout-top .tool-btn,
+.main-container.layout-top .action-btn,
+.main-container.layout-top .mode-btn {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    min-width: 32px;
+}
+
+.main-container.layout-top .tool-btn i,
+.main-container.layout-top .action-btn i,
+.main-container.layout-top .mode-btn i {
+    font-size: 0.9rem;
+}
+
+.main-container.layout-top .tool-btn span,
+.main-container.layout-top .action-btn span,
+.main-container.layout-top .mode-btn span {
+    display: none;
+}
+
+.main-container.layout-top .thickness-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.main-container.layout-top .thickness-group label {
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+.main-container.layout-top #thicknessSlider {
+    width: 60px;
+}
+
+.main-container.layout-top .page-controls-sidebar,
+.main-container.layout-top .zoom-controls-sidebar {
+    gap: 0.25rem;
+}
+
+.main-container.layout-top .control-btn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+}
+
+.main-container.layout-top .page-info {
+    font-size: 0.75rem;
+    min-width: 60px;
+}
+
+.main-container.layout-top .reset-zoom-btn-sidebar {
+    min-width: 45px !important;
+    padding: 0 0.5rem !important;
+    font-size: 0.7rem !important;
+}
+
+.main-container.layout-top .scroll-controls {
+    flex-direction: row;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.main-container.layout-top .scroll-row {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.main-container.layout-top .scroll-btn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    padding: 0;
+    font-size: 0.85rem;
+}
+
+.main-container.layout-top .scroll-controls {
+    flex-direction: row;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+.main-container.layout-top .scroll-row {
+    display: flex;
+    gap: 0.3rem;
+}
+
+/* 上部レイアウト時：左→上→下→右の配置 */
+.main-container.layout-top .scroll-row:nth-child(1) {
+    order: 2; /* 上ボタン */
+}
+
+.main-container.layout-top .scroll-row:nth-child(2) {
+    order: 1; /* 左ボタンを先頭に、右ボタンを最後に */
+    display: contents; /* 子要素を直接配置 */
+}
+
+.main-container.layout-top .scroll-row:nth-child(2) #scrollLeftBtn {
+    order: 1; /* 左ボタン */
+}
+
+.main-container.layout-top .scroll-row:nth-child(2) #scrollRightBtn {
+    order: 4; /* 右ボタンを最後に */
+}
+
+.main-container.layout-top .scroll-row:nth-child(3) {
+    order: 3; /* 下ボタン */
+}
+
+.main-container.layout-top .scroll-center {
+    display: none;
+}
+
+.main-container.layout-top .canvas-area {
+    flex: 1;
+}
+
+/* ツールバー（左サイドバー） */
+.toolbar {
+    width: 280px;
+    background: white;
+    border-right: 1px solid #e0e0e0;
+    overflow-y: auto;
+    padding: 1.5rem;
+    padding-bottom: 5rem; /* 下部の見切れ防止（増量） */
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.toolbar-section {
+    margin-bottom: 1.5rem;
+}
+
+.toolbar-section:last-child {
+    margin-bottom: 0; /* 最後のセクションのマージンを削除 */
+}
+
+.toolbar-section h3 {
+    font-size: 0.9rem;
+    margin-bottom: 0.8rem;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* ページ・ズームコントロール（サイドバー用） */
+.page-controls-sidebar,
+.zoom-controls-sidebar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* 100%リセットボタン（サイドバー用） */
+.reset-zoom-btn-sidebar {
+    min-width: 55px !important;
+    padding: 0 0.8rem !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+}
+
+.tool-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tool-btn {
+    padding: 0.8rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.tool-btn:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+.tool-btn.active {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.tool-btn i {
+    font-size: 1.2rem;
+}
+
+/* 色選択 */
+.color-group {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+
+.color-btn {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 3px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.color-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.color-btn.active {
+    border-color: #333;
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 太さ調整 */
+.thickness-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.thickness-group label {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+#thicknessSlider {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: #e0e0e0;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+#thicknessSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#thicknessSlider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* アクションボタン */
+.action-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.action-btn {
+    padding: 0.8rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+.action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.action-btn i {
+    font-size: 1.1rem;
+}
+
+/* モードボタン */
+.mode-btn {
+    padding: 0.8rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.mode-btn:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+.mode-btn.active {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.mode-btn i {
+    font-size: 1.1rem;
+}
+
+/* キャンバスエリア */
+.canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #f5f5f5;
+    overflow: hidden;
+}
+
+/* 上部コントロールは削除（サイドバーに統合） */
+
+.scroll-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background: #f5f7fa;
+    border-radius: 8px;
+}
+
+.scroll-row {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.scroll-btn {
+    width: 36px;
+    height: 36px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 1rem;
+}
+
+.scroll-btn:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+    color: #667eea;
+    transform: scale(1.05);
+}
+
+.scroll-btn:active {
+    background: #667eea;
+    color: white;
+    transform: scale(0.95);
+}
+
+.scroll-center {
+    width: 36px;
+    height: 36px;
+}
+
+.control-btn {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.control-btn:hover:not(:disabled) {
+    border-color: #667eea;
+    background: #f8f9ff;
+    color: #667eea;
+}
+
+.control-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.reset-zoom-btn {
+    width: auto;
+    min-width: 50px;
+    padding: 0 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.page-info,
+.zoom-info {
+    font-size: 0.95rem;
+    color: #666;
+    font-weight: 500;
+    min-width: 100px;
+    text-align: center;
+}
+
+.mode-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.mode-btn {
+    padding: 0.6rem 1rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.mode-btn:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+.mode-btn.active {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.mode-btn i {
+    font-size: 1.1rem;
+}
+
+.canvas-container {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem;
+    position: relative;
+    box-sizing: border-box;
+    /* テキスト選択を無効化 */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.canvas-wrapper {
+    position: relative;
+    display: inline-block;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    background: white;
+    border-radius: 4px;
+    overflow: visible;
+    margin: auto 0;
+    /* チラつき防止 */
+    will-change: transform;
+    /* テキスト選択を無効化 */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.canvas-wrapper canvas {
+    display: block;
+    cursor: crosshair;
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* チラつき防止 */
+    will-change: contents;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    /* テキスト選択を無効化 */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    /* タッチ時のコールアウトを無効化 */
+    -webkit-touch-callout: none;
+}
+
+#pdfCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#drawingCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    touch-action: none; /* iPadのデフォルトタッチ動作を無効化 */
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* 空の状態 */
+.empty-state {
+    text-align: center;
+    color: #999;
+}
+
+.empty-state i {
+    font-size: 5rem;
+    margin-bottom: 1rem;
+    color: #ddd;
+}
+
+.empty-state h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: #666;
+}
+
+.empty-state p {
+    font-size: 1rem;
+    margin-bottom: 2rem;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 1024px) {
+    .toolbar {
+        width: 240px;
+    }
+}
+
+/* iPad横向き・タブレット横向き（768px以上、1024px以下） */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
+    /* 左サイドバーレイアウト時（デフォルト） */
+    .menu-toggle-btn {
+        display: block;
+    }
+    
+    .toolbar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        height: 100vh;
+        z-index: 1000;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .toolbar.open {
+        left: 0;
+    }
+    
+    /* 上部バーレイアウト時はメニューボタンを非表示 */
+    .main-container.layout-top .menu-toggle-btn {
+        display: none;
+    }
+    
+    .main-container.layout-top .toolbar {
+        position: static;
+        left: 0;
+        height: auto;
+    }
+    
+    .toolbar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+    
+    .toolbar-overlay.show {
+        display: block;
+    }
+    
+    /* 上部バーレイアウト時はオーバーレイ不要 */
+    .main-container.layout-top .toolbar-overlay {
+        display: none !important;
+    }
+    
+    .main-container {
+        flex-direction: row;
+    }
+    
+    main {
+        flex: 1;
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .app-header {
+        padding: 0.8rem 1rem;
+    }
+
+    .header-left h1 {
+        font-size: 1.2rem;
+    }
+    
+    .menu-toggle-btn {
+        display: block;
+    }
+    
+    .btn-text {
+        display: none;
+    }
+
+    /* 左サイドバーレイアウト時 */
+    .toolbar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        height: 100vh;
+        z-index: 1000;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .toolbar.open {
+        left: 0;
+    }
+    
+    /* 上部バーレイアウト時はモバイルでも固定表示 */
+    .main-container.layout-top .toolbar {
+        position: static;
+        left: 0;
+        height: auto;
+    }
+    
+    .main-container.layout-top .menu-toggle-btn {
+        display: none;
+    }
+    
+    .toolbar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+    
+    .toolbar-overlay.show {
+        display: block;
+    }
+    
+    /* 上部バーレイアウト時はオーバーレイ不要 */
+    .main-container.layout-top .toolbar-overlay {
+        display: none !important;
+    }
+
+    .canvas-controls {
+        padding: 0.8rem 1rem;
+    }
+
+    .page-info,
+    .zoom-info {
+        font-size: 0.85rem;
+        min-width: 80px;
+    }
+
+    .control-btn {
+        width: 36px;
+        height: 36px;
+    }
+}
+
+/* スクロールバーのカスタマイズ */
+.toolbar::-webkit-scrollbar,
+.canvas-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.toolbar::-webkit-scrollbar-track,
+.canvas-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.toolbar::-webkit-scrollbar-thumb,
+.canvas-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.toolbar::-webkit-scrollbar-thumb:hover,
+.canvas-container::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* ローディングアニメーション */
+.loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2rem;
+    color: #667eea;
+}
+
+.loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
