@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/tfab-integration.css">
     <link rel="stylesheet" href="css/pwa-install.css">
-    <link rel="stylesheet" href="css/debug.css">
+
 </head>
 <body>
     <!-- ヘッダー -->
@@ -37,6 +37,7 @@
             </h1>
         </div>
         <div class="header-right">
+            <span id="saveStatus" role="status" aria-live="polite">ノートを開いてください</span>
             <button id="toggleLayoutBtn" class="btn btn-secondary" title="ツールバーを左/上に切替">
                 <i class="fas fa-arrow-up" id="layoutIcon"></i> <span class="btn-text">レイアウト</span>
             </button>
@@ -231,7 +232,7 @@
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
     
     <!-- jsPDF ライブラリ（PDF出力用） -->
-    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     
     <!-- デバッグモード設定（必要な場合のみ有効化） -->
     <script>
@@ -259,6 +260,7 @@
             }
         });
     </script>
+    <script src="js/notebook.js"></script>
     <script src="js/app.js"></script>
     <!-- T-fab Tile 連携 -->
     <script src="js/tfab-integration.js"></script>

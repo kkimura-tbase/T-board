@@ -10,8 +10,9 @@ const appState = {
     isDrawing: false,
     lastX: 0,
     lastY: 0,
-    drawingHistory: [],
-    historyStep: -1,
+    histories: {},
+    rendering: false,
+    renderVersion: 0,
     annotations: {}, // ページごとの注釈を保存（座標配列ベース）
     currentStrokes: [], // 現在のページの描画ストローク（座標ベース）
     pdfData: null, // PDFのバイナリデータを保持
@@ -50,6 +51,98 @@ const appState = {
     renderTimer: null,
     targetScale: 1.5
 };
+
+let saveQueue = Promise.resolve();
+let saveRevision = 0;
+let savedRevision = 0;
+let recoveryAvailable = false;
+
+function setSaveStatus(text) {
+    document.getElementById('saveStatus').textContent = text;
+}
+
+function captureNotebook() {
+    return {
+        version: 1,
+        blankMode: appState.blankMode,
+        pdfData: appState.pdfData?.slice() || null,
+        totalPages: appState.totalPages,
+        currentPage: appState.currentPage,
+        annotations: Notebook.clone(appState.annotations),
+        scale: appState.scale
+    };
+}
+
+function queueNotebookSave() {
+    if (!appState.totalPages) return saveQueue;
+    saveCurrentAnnotations();
+    const snapshot = captureNotebook();
+    const revision = ++saveRevision;
+    setSaveStatus('端末に保存中…');
+    saveQueue = saveQueue.catch(() => {}).then(() => NotebookStore.write(snapshot)).then(() => {
+        savedRevision = revision;
+        recoveryAvailable = true;
+        if (revision === saveRevision) setSaveStatus('端末に保存済み');
+    }).catch(error => {
+        console.error('自動保存失敗:', error);
+        setSaveStatus('自動保存できません。PDF保存してください');
+    });
+    return saveQueue;
+}
+
+async function confirmReplaceNotebook() {
+    if (!appState.totalPages && !recoveryAvailable) return true;
+    return confirm('新しいノートを開くと、自動保存中のノートを置き換えます。必要な内容はPDF保存しましたか？');
+}
+
+async function restoreNotebook() {
+    // Prevent a late database read from replacing a notebook the user has just opened.
+    document.querySelector('.main-container').inert = true;
+    document.querySelector('.app-header').inert = true;
+    appState.rendering = true;
+    try {
+        const saved = await NotebookStore.read();
+        if (!saved) return;
+        recoveryAvailable = true;
+        if (saved.version !== 1 || !saved.totalPages || !saved.annotations) throw new Error('保存形式を読み込めません');
+        if (!confirm('前回のノートを復元しますか？')) {
+            setSaveStatus('前回のノートは保持されています');
+            return;
+        }
+        let pdfDoc = null;
+        if (!saved.blankMode) {
+            pdfDoc = await pdfjsLib.getDocument({
+                data: saved.pdfData.slice(), isEvalSupported: false,
+                cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/', cMapPacked: true
+            }).promise;
+        }
+        Object.assign(appState, saved, { pdfDoc, histories: {}, currentStrokes: [] });
+        appState.blankPages = saved.blankMode ? Array.from({ length: saved.totalPages }, (_, i) => i + 1) : [];
+        elements.addPageBtn.style.display = saved.blankMode ? 'flex' : 'none';
+        if (saved.blankMode) await renderBlankPage(1122, 793);
+        else await renderPage(saved.currentPage);
+        updatePageInfo();
+        elements.zoomInfo.textContent = Math.round(appState.scale * 100) + '%';
+        setSaveStatus('前回のノートを復元しました');
+    } catch (error) {
+        console.error(error);
+        setSaveStatus('保存データを読み込めません。再読み込みをお試しください');
+    } finally {
+        appState.rendering = false;
+        document.querySelector('.main-container').inert = false;
+        document.querySelector('.app-header').inert = false;
+    }
+}
+
+window.addEventListener('beforeunload', event => {
+    if (savedRevision < saveRevision || appState.isDrawing) {
+        event.preventDefault();
+        event.returnValue = '';
+    }
+});
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && appState.totalPages) queueNotebookSave();
+});
 
 // DOM要素の取得
 const elements = {
@@ -214,6 +307,7 @@ function setupEventListeners() {
 
 // PDFファイルの選択処理
 async function handleFileSelect(event) {
+    if (appState.rendering) return;
     const file = event.target.files[0];
     if (!file) {
         alert('ファイルを選択してください。');
@@ -226,9 +320,10 @@ async function handleFileSelect(event) {
         return;
     }
 
+    if (!await confirmReplaceNotebook()) return;
+    appState.rendering = true;
     try {
-        // ローディング表示
-        elements.canvasContainer.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> 読み込み中...</div>';
+        setSaveStatus('PDFを読み込み中…');
 
         console.log('ファイル情報:', {
             name: file.name,
@@ -247,21 +342,25 @@ async function handleFileSelect(event) {
         console.log('ArrayBuffer size:', arrayBuffer.byteLength);
         
         // PDFデータを保存
-        appState.pdfData = new Uint8Array(arrayBuffer);
+        const pdfData = new Uint8Array(arrayBuffer);
         
         // PDFドキュメントの読み込み
         console.log('PDFドキュメントを読み込み中...');
         const loadingTask = pdfjsLib.getDocument({
-            data: appState.pdfData,
+            data: pdfData.slice(),
+            isEvalSupported: false,
             cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
             cMapPacked: true,
             verbosity: 0
         });
         
         appState.pdfDoc = await loadingTask.promise;
+        appState.pdfData = pdfData;
         appState.totalPages = appState.pdfDoc.numPages;
         appState.currentPage = 1;
         appState.annotations = {};
+        appState.currentStrokes = [];
+        appState.histories = {};
         appState.blankMode = false; // PDFモードに切り替え
         appState.blankPages = [];
 
@@ -273,6 +372,7 @@ async function handleFileSelect(event) {
         // PDFを表示
         await renderPage(appState.currentPage);
         updatePageInfo();
+        queueNotebookSave();
     } catch (error) {
         console.error('❌ PDFの読み込みエラー:', error);
         console.error('エラー詳細:', {
@@ -281,41 +381,17 @@ async function handleFileSelect(event) {
             stack: error.stack
         });
         
-        let errorMessage = error.message || '不明なエラー';
-        let suggestions = [];
-        
-        if (errorMessage.includes('Invalid PDF')) {
-            suggestions.push('このファイルは有効なPDFファイルではない可能性があります。');
-            suggestions.push('別のPDFファイルをお試しください。');
-        } else if (errorMessage.includes('password')) {
-            suggestions.push('このPDFはパスワード保護されています。');
-            suggestions.push('パスワードのないPDFファイルをご使用ください。');
-        } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
-            suggestions.push('ネットワークエラーが発生しました。');
-            suggestions.push('インターネット接続を確認してください。');
-        } else {
-            suggestions.push('別のPDFファイルをお試しください。');
-            suggestions.push('ブラウザを再読み込みしてください。');
-        }
-        
-        elements.canvasContainer.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-exclamation-triangle" style="color: #ff6b6b;"></i>
-                <h2>PDFの読み込みに失敗しました</h2>
-                <p style="color: #666; margin: 1rem 0;"><strong>エラー:</strong> ${errorMessage}</p>
-                <div style="text-align: left; max-width: 500px; margin: 1rem auto;">
-                    ${suggestions.map(s => `<p style="color: #666; margin: 0.5rem 0;">• ${s}</p>`).join('')}
-                </div>
-                <button class="btn btn-primary" onclick="document.getElementById('pdfInput').click()" style="margin-top: 1rem;">
-                    <i class="fas fa-upload"></i> 別のPDFを選択
-                </button>
-            </div>
-        `;
+        setSaveStatus('PDFを読み込めませんでした。現在のノートは保持されています');
+        alert('PDFの読み込みに失敗しました。パスワードのない有効なPDFを選択してください。');
+    } finally {
+        appState.rendering = false;
+        elements.pdfInput.value = '';
     }
 }
 
-// ページのレンダリング（オフスクリーンバッファリング対応）
 async function renderPage(pageNum) {
+    const version = ++appState.renderVersion;
+    appState.rendering = true;
     try {
         console.log('ページレンダリング開始:', pageNum);
 
@@ -383,45 +459,12 @@ async function renderPage(pageNum) {
         await page.render(renderContext).promise;
         console.log('✓ PDFレンダリング完了（オフスクリーン）');
 
-        // 描画内容を復元（オフスクリーンに）- 座標ベース
-        const savedStrokes = appState.annotations[pageNum];
-        if (savedStrokes && savedStrokes.length > 0) {
-            console.log(`✓ 注釈を復元中: ${savedStrokes.length} ストローク`);
-            
-            savedStrokes.forEach(stroke => {
-                // 正規化座標を実座標に変換
-                const startX = stroke.startX * viewport.width;
-                const startY = stroke.startY * viewport.height;
-                const endX = stroke.endX * viewport.width;
-                const endY = stroke.endY * viewport.height;
-                
-                offscreenDrawingContext.beginPath();
-                offscreenDrawingContext.moveTo(startX, startY);
-                offscreenDrawingContext.lineTo(endX, endY);
-                
-                if (stroke.tool === 'eraser') {
-                    offscreenDrawingContext.globalCompositeOperation = 'destination-out';
-                    offscreenDrawingContext.lineWidth = stroke.thickness * 3;
-                } else {
-                    offscreenDrawingContext.globalCompositeOperation = 'source-over';
-                    offscreenDrawingContext.strokeStyle = stroke.color;
-                    offscreenDrawingContext.lineWidth = stroke.thickness;
-                    offscreenDrawingContext.globalAlpha = stroke.alpha;
-                }
-                
-                offscreenDrawingContext.lineCap = 'round';
-                offscreenDrawingContext.lineJoin = 'round';
-                offscreenDrawingContext.stroke();
-                offscreenDrawingContext.globalAlpha = 1.0;
-                offscreenDrawingContext.globalCompositeOperation = 'source-over';
-            });
-            
-            console.log('✓ 注釈復元完了');
-        }
-        
-        // 現在のページのストロークを復元
-        appState.currentStrokes = savedStrokes ? [...savedStrokes] : [];
-        
+        if (version !== appState.renderVersion) return;
+        const savedStrokes = appState.annotations[pageNum] || [];
+        Notebook.paint(offscreenDrawingContext, savedStrokes, viewport.width, viewport.height);
+        appState.currentStrokes = Notebook.clone(savedStrokes);
+        Notebook.history(appState);
+
         // ここで一気に表Canvas に転送（チラつき最小化）
         pdfCanvas.width = viewport.width;
         pdfCanvas.height = viewport.height;
@@ -446,6 +489,7 @@ async function renderPage(pageNum) {
         
         console.log('✓ ページ表示完了');
     } catch (error) {
+        if (version !== appState.renderVersion) return;
         console.error('❌ ページのレンダリングエラー:', error);
         console.error('エラー詳細:', {
             name: error.name,
@@ -461,6 +505,8 @@ async function renderPage(pageNum) {
                 <p style="color: #666;">ブラウザのコンソールで詳細を確認してください。</p>
             </div>
         `;
+    } finally {
+        if (version === appState.renderVersion) appState.rendering = false;
     }
 }
 
@@ -488,7 +534,7 @@ function setupDrawingCanvas(canvas) {
             endX: normalizedX,
             endY: normalizedY,
             color: appState.currentColor,
-            thickness: appState.thickness,
+            width: appState.thickness / canvas.width,
             tool: appState.currentTool,
             alpha: appState.currentTool === 'marker' ? 0.25 : 1.0
         };
@@ -528,7 +574,7 @@ function setupDrawingCanvas(canvas) {
     canvas.addEventListener('pointerdown', startDrawing, { passive: false });
     canvas.addEventListener('pointermove', draw, { passive: false });
     canvas.addEventListener('pointerup', stopDrawing, { passive: false });
-    canvas.addEventListener('pointerleave', stopDrawing, { passive: false });
+    canvas.addEventListener('lostpointercapture', stopDrawing, { passive: false });
     canvas.addEventListener('pointercancel', stopDrawing, { passive: false });
 
     // タッチイベントを追加（ピンチズーム用）
@@ -537,7 +583,9 @@ function setupDrawingCanvas(canvas) {
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
+    let activePointer = null;
     function startDrawing(e) {
+        if (appState.rendering || appState.pinchZoom.active || activePointer !== null) return;
         // デフォルト動作を防止（iPad Safari のジェスチャー認識を無効化）
         e.preventDefault();
         
@@ -545,8 +593,7 @@ function setupDrawingCanvas(canvas) {
         if (appState.penOnlyMode) {
             // Apple Pencil の判定を改善
             // - pointerType が 'pen' である
-            // - または pressure が 0 より大きい（Apple Pencil の特徴）
-            const isPenInput = e.pointerType === 'pen' || (e.pressure && e.pressure > 0);
+            const isPenInput = Notebook.isPen(e);
             
             if (!isPenInput && e.pointerType === 'touch') {
                 // 指の場合はスクロールモードに入る
@@ -564,23 +611,16 @@ function setupDrawingCanvas(canvas) {
             }
         }
         
-        // 最初の描画の場合、現在の空の状態を履歴に保存
-        if (appState.drawingHistory.length === 0) {
-            const currentState = canvas.toDataURL();
-            appState.drawingHistory.push(currentState);
-            appState.historyStep = 0;
-        }
-        
+        Notebook.history(appState);
+        activePointer = e.pointerId;
         appState.isDrawing = true;
+        canvas.setPointerCapture?.(e.pointerId);
         const rect = canvas.getBoundingClientRect();
         appState.lastX = e.clientX - rect.left;
         appState.lastY = e.clientY - rect.top;
-
-        // 履歴の分岐処理（やり直しの途中で新しい描画を開始した場合）
-        if (appState.historyStep < appState.drawingHistory.length - 1) {
-            appState.drawingHistory = appState.drawingHistory.slice(0, appState.historyStep + 1);
-        }
+        drawPoint({ x: appState.lastX, y: appState.lastY });
     }
+
 
     function draw(e) {
         // デフォルト動作を防止（iPad Safari のジェスチャー認識を無効化）
@@ -597,12 +637,12 @@ function setupDrawingCanvas(canvas) {
             return; // 描画はしない
         }
         
-        if (!appState.isDrawing) return;
+        if (!appState.isDrawing || e.pointerId !== activePointer) return;
         
         // ペン専用モードの場合、ペン以外を無視
         if (appState.penOnlyMode) {
             // Apple Pencil の判定を改善
-            const isPenInput = e.pointerType === 'pen' || (e.pressure && e.pressure > 0);
+            const isPenInput = Notebook.isPen(e);
             if (!isPenInput) {
                 return;
             }
@@ -611,7 +651,8 @@ function setupDrawingCanvas(canvas) {
         const rect = canvas.getBoundingClientRect();
         
         // Coalesced Events を取得（間引かれたイベントも含む）
-        const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+        const coalesced = e.getCoalescedEvents?.() || [];
+        const events = coalesced.length ? coalesced : [e];
         
         // すべてのイベントを描画
         for (const event of events) {
@@ -622,6 +663,8 @@ function setupDrawingCanvas(canvas) {
     }
 
     function stopDrawing(e) {
+        if (activePointer !== null && e.pointerId !== activePointer) return;
+        activePointer = null;
         // 指スクロール終了
         if (appState.fingerScroll.active) {
             appState.fingerScroll.active = false;
@@ -635,31 +678,6 @@ function setupDrawingCanvas(canvas) {
 
     // ピンチズーム・パン用のタッチイベント処理
     function handleTouchStart(e) {
-        if (e.touches.length === 1) {
-            // 単一タッチ（Apple Pencil または指）
-            const touch = e.touches[0];
-            
-            // Apple Pencil の判定：force > 0 または touchType === 'stylus'
-            const isApplePencil = touch.force > 0 || touch.touchType === 'stylus';
-            
-            if (isApplePencil || !appState.penOnlyMode) {
-                // Apple Pencil または ペン専用モードOFF の場合、描画開始
-                // pointerdown の代わりに touchstart で startDrawing を呼ぶ
-                const syntheticEvent = {
-                    preventDefault: () => e.preventDefault(),
-                    clientX: touch.clientX,
-                    clientY: touch.clientY,
-                    pointerType: isApplePencil ? 'pen' : 'touch',
-                    pressure: touch.force || 0,
-                    pointerId: touch.identifier
-                };
-                
-                console.log('🟢 touchstart から startDrawing 呼び出し:', syntheticEvent.pointerType, 'force:', touch.force);
-                startDrawing(syntheticEvent);
-                return;
-            }
-        }
-        
         if (e.touches.length === 2) {
             // 2本指タッチ = ピンチズームまたはパン
             e.preventDefault();
@@ -686,6 +704,7 @@ function setupDrawingCanvas(canvas) {
             appState.pinchZoom.active = true;
             appState.pinchZoom.initialDistance = getTouchDistance(touch1, touch2);
             appState.pinchZoom.initialScale = appState.scale;
+            appState.targetScale = appState.scale;
             appState.pinchZoom.centerX = relativeX;  // コンテナ内相対位置
             appState.pinchZoom.centerY = relativeY;
             
@@ -696,6 +715,7 @@ function setupDrawingCanvas(canvas) {
             appState.pan.scrollLeft = container.scrollLeft;
             appState.pan.scrollTop = container.scrollTop;
             
+            activePointer = null;
             // 描画を停止
             if (appState.isDrawing) {
                 appState.isDrawing = false;
@@ -712,27 +732,6 @@ function setupDrawingCanvas(canvas) {
     }
 
     function handleTouchMove(e) {
-        if (e.touches.length === 1) {
-            // 単一タッチ（Apple Pencil または指）
-            const touch = e.touches[0];
-            const isApplePencil = touch.force > 0 || touch.touchType === 'stylus';
-            
-            if (isApplePencil || !appState.penOnlyMode) {
-                // 描画中なら draw を呼ぶ
-                const syntheticEvent = {
-                    preventDefault: () => e.preventDefault(),
-                    clientX: touch.clientX,
-                    clientY: touch.clientY,
-                    pointerType: isApplePencil ? 'pen' : 'touch',
-                    pressure: touch.force || 0,
-                    pointerId: touch.identifier
-                };
-                
-                draw(syntheticEvent);
-                return;
-            }
-        }
-        
         if (e.touches.length === 2) {
             e.preventDefault();
             
@@ -804,26 +803,6 @@ function setupDrawingCanvas(canvas) {
     }
 
     function handleTouchEnd(e) {
-        // 単一タッチ終了（Apple Pencil または指）
-        if (e.changedTouches.length === 1 && e.touches.length === 0) {
-            const touch = e.changedTouches[0];
-            const isApplePencil = touch.force > 0 || touch.touchType === 'stylus';
-            
-            if (isApplePencil || !appState.penOnlyMode) {
-                const syntheticEvent = {
-                    preventDefault: () => e.preventDefault(),
-                    type: 'pointerup',
-                    clientX: touch.clientX,
-                    clientY: touch.clientY,
-                    pointerType: isApplePencil ? 'pen' : 'touch',
-                    pressure: touch.force || 0,
-                    pointerId: touch.identifier
-                };
-                
-                stopDrawing(syntheticEvent);
-            }
-        }
-        
         if (e.touches.length < 2) {
             // 2本指操作終了
             if (appState.pinchZoom.active || appState.pan.active) {
@@ -862,118 +841,48 @@ function setupDrawingCanvas(canvas) {
 
 // 描画状態を保存
 function saveDrawingState() {
-    const canvas = document.getElementById('drawingCanvas');
-    if (!canvas) return;
-
-    const imageData = canvas.toDataURL();
-    appState.drawingHistory.push(imageData);
-    appState.historyStep++;
-
-    // 履歴は最大50ステップまで
-    if (appState.drawingHistory.length > 50) {
-        appState.drawingHistory.shift();
-        appState.historyStep--;
-    }
+    Notebook.commit(appState);
+    queueNotebookSave();
 }
 
-// 現在のページの注釈を保存（座標ベース）
 function saveCurrentAnnotations() {
-    if (appState.currentStrokes && appState.currentStrokes.length > 0) {
-        appState.annotations[appState.currentPage] = [...appState.currentStrokes];
-        console.log('💾 注釈を保存:', appState.currentPage, 'ページ', `(${appState.currentStrokes.length} ストローク)`);
-    }
+    appState.annotations[appState.currentPage] = Notebook.clone(appState.currentStrokes);
 }
 
-// 注釈を復元
 async function restoreAnnotations() {
-    const canvas = document.getElementById('drawingCanvas');
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (appState.annotations[appState.currentPage]) {
-        // 注釈がある場合は画像を復元
-        await new Promise((resolve) => {
-            const img = new Image();
-            img.onload = function() {
-                // キャンバスサイズに合わせて画像をスケーリング
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                // 履歴を復元された注釈で初期化
-                const restoredState = canvas.toDataURL();
-                appState.drawingHistory = [restoredState];
-                appState.historyStep = 0;
-                console.log('✓ 注釈を復元:', appState.currentPage, 'ページ', `(${canvas.width}x${canvas.height})`);
-                resolve();
-            };
-            img.onerror = function() {
-                console.error('注釈画像の読み込みに失敗');
-                appState.drawingHistory = [];
-                appState.historyStep = -1;
-                resolve();
-            };
-            img.src = appState.annotations[appState.currentPage];
-        });
-    } else {
-        // 注釈がない場合は空の状態
-        appState.drawingHistory = [];
-        appState.historyStep = -1;
-        console.log('注釈なし:', appState.currentPage, 'ページ（空白）');
-    }
+    appState.currentStrokes = Notebook.clone(appState.annotations[appState.currentPage] || []);
+    Notebook.history(appState);
+    repaintAnnotations();
 }
 
-// 元に戻す
+function repaintAnnotations() {
+    const canvas = document.getElementById('drawingCanvas');
+    if (canvas) Notebook.paint(canvas.getContext('2d'), appState.currentStrokes, canvas.width, canvas.height);
+}
+
 function undo() {
-    if (appState.historyStep > 0) {
-        appState.historyStep--;
-        restoreFromHistory();
-    }
+    if (appState.rendering || appState.isDrawing) return;
+    if (Notebook.move(appState, -1)) { repaintAnnotations(); queueNotebookSave(); }
 }
 
-// やり直し
 function redo() {
-    if (appState.historyStep < appState.drawingHistory.length - 1) {
-        appState.historyStep++;
-        restoreFromHistory();
-    }
+    if (appState.rendering || appState.isDrawing) return;
+    if (Notebook.move(appState, 1)) { repaintAnnotations(); queueNotebookSave(); }
 }
 
-// 履歴から復元
-function restoreFromHistory() {
-    const canvas = document.getElementById('drawingCanvas');
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (appState.historyStep >= 0 && appState.drawingHistory[appState.historyStep]) {
-        const img = new Image();
-        img.onload = function() {
-            ctx.drawImage(img, 0, 0);
-        };
-        img.src = appState.drawingHistory[appState.historyStep];
-    }
-}
-
-// キャンバスをクリア
 function clearCanvas() {
+    if (appState.rendering || appState.isDrawing || !appState.totalPages) return;
     if (!confirm('このページの書き込みを全て消去しますか？')) return;
-
-    const canvas = document.getElementById('drawingCanvas');
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 履歴をリセット
-    appState.drawingHistory = [];
-    appState.historyStep = -1;
-    delete appState.annotations[appState.currentPage];
+    Notebook.history(appState);
+    appState.currentStrokes = [];
     saveDrawingState();
+    repaintAnnotations();
 }
+
 
 // ページ変更
 async function changePage(delta) {
+    if (appState.rendering || appState.isDrawing) return;
     const newPage = appState.currentPage + delta;
     if (newPage < 1 || newPage > appState.totalPages) return;
 
@@ -997,6 +906,7 @@ async function changePage(delta) {
 
 // ズーム変更（注釈を保持）
 async function changeZoom(delta) {
+    if (appState.rendering || appState.isDrawing) return;
     // 現在の注釈を保存
     saveCurrentAnnotations();
     
@@ -1016,6 +926,14 @@ async function changeZoom(delta) {
 
 // 幅に合わせる
 async function fitToWidth() {
+    if (appState.rendering || appState.isDrawing) return;
+    if (appState.blankMode) {
+        saveCurrentAnnotations();
+        appState.scale = Math.max(0.5, Math.min(5, (elements.canvasContainer.clientWidth - 40) / 1122));
+        await renderBlankPage(1122, 793);
+        elements.zoomInfo.textContent = Math.round(appState.scale * 100) + '%';
+        return;
+    }
     if (!appState.pdfDoc) {
         console.warn('PDFが読み込まれていません');
         return;
@@ -1041,6 +959,7 @@ async function fitToWidth() {
 
 // ズームを100%にリセット
 async function resetZoom() {
+    if (appState.rendering || appState.isDrawing) return;
     // 現在の注釈を保存
     saveCurrentAnnotations();
     
@@ -1202,125 +1121,56 @@ function saveAsImage() {
 
 // PDFとして保存（全ページ）
 async function saveAsPDF() {
-    const pdfCanvas = document.getElementById('pdfCanvas');
-    const drawingCanvas = document.getElementById('drawingCanvas');
-    
-    if (!pdfCanvas || !drawingCanvas) {
-        alert('キャンバスが見つかりません。');
-        return;
-    }
-    
-    // jsPDFが読み込まれているか確認
-    if (typeof window.jspdf === 'undefined') {
-        alert('PDF生成ライブラリの読み込みに失敗しました。ページを再読み込みしてください。');
-        return;
-    }
-    
+    if (!appState.totalPages || appState.rendering || appState.isDrawing || appState.exporting) return;
+    appState.exporting = true;
+    elements.savePdfBtn.disabled = true;
     try {
-        console.log('PDF生成を開始...');
-        
-        // 現在のページの注釈を保存
         saveCurrentAnnotations();
-        
-        // 元のページを記憶
-        const originalPage = appState.currentPage;
-        
-        const { jsPDF } = window.jspdf;
-        
-        let pdf = null;
-        let isFirstPage = true;
-        
-        // 全ページをループ
-        for (let pageNum = 1; pageNum <= appState.totalPages; pageNum++) {
-            console.log(`ページ ${pageNum}/${appState.totalPages} を処理中...`);
-            
-            // ページを切り替え（表示を更新）
-            if (pageNum !== appState.currentPage) {
-                // ページ番号を変更する前に現在のページの注釈を保存
-                saveCurrentAnnotations();
-                
-                appState.currentPage = pageNum;
-                if (appState.blankMode) {
-                    await renderBlankPage(1122, 793);
-                } else {
-                    await renderPage(pageNum);
-                }
-                // レンダリングを待つ（注釈の復元も含む）
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            
-            // キャンバスを取得（レンダリング後）
-            const currentPdfCanvas = document.getElementById('pdfCanvas');
-            const currentDrawingCanvas = document.getElementById('drawingCanvas');
-            
-            if (!currentPdfCanvas || !currentDrawingCanvas) continue;
-            
-            const canvasWidth = currentPdfCanvas.width;
-            const canvasHeight = currentPdfCanvas.height;
-            
-            console.log(`キャンバスサイズ: ${canvasWidth} x ${canvasHeight}`);
-            
-            // 最初のページでPDFのサイズと向きを決定
-            if (isFirstPage) {
-                const orientation = canvasWidth > canvasHeight ? 'landscape' : 'portrait';
-                pdf = new jsPDF({
-                    orientation: orientation,
-                    unit: 'px',
-                    format: [canvasWidth, canvasHeight]
-                });
-                console.log(`PDF作成: ${orientation}, ${canvasWidth}x${canvasHeight}`);
-            }
-            
-            // 一時的な結合キャンバスを作成
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvasWidth;
-            tempCanvas.height = canvasHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-            
-            // PDFと描画を結合
-            tempCtx.drawImage(currentPdfCanvas, 0, 0);
-            tempCtx.drawImage(currentDrawingCanvas, 0, 0);
-            
-            // 画像データを取得
-            const imgData = tempCanvas.toDataURL('image/jpeg', 0.95);
-            
-            // 最初のページ以外は新しいページを追加
-            if (!isFirstPage) {
-                pdf.addPage([canvasWidth, canvasHeight]);
-            }
-            isFirstPage = false;
-            
-            // 画像をPDFに追加
-            pdf.addImage(imgData, 'JPEG', 0, 0, canvasWidth, canvasHeight);
+        // Snapshot before awaiting: export never changes the visible page or live notebook.
+        const snapshot = captureNotebook();
+        const { PDFDocument, degrees } = window.PDFLib;
+        const pdf = snapshot.blankMode ? await PDFDocument.create() : await PDFDocument.load(snapshot.pdfData);
+        for (let i = 0; i < snapshot.totalPages; i++) {
+            const page = snapshot.blankMode ? pdf.addPage([841.5, 594.75]) : pdf.getPage(i);
+            const strokes = snapshot.annotations[i + 1] || [];
+            if (!strokes.length) continue;
+            const box = page.getCropBox();
+            const rotation = ((page.getRotation().angle % 360) + 360) % 360;
+            const sideways = rotation === 90 || rotation === 270;
+            const width = sideways ? box.height : box.width;
+            const height = sideways ? box.width : box.height;
+            const canvas = document.createElement('canvas');
+            // Fixed resolution, independent of screen zoom; bound peak canvas memory.
+            const factor = Math.min(2, 4096 / Math.max(width, height));
+            canvas.width = Math.ceil(width * factor);
+            canvas.height = Math.ceil(height * factor);
+            Notebook.paint(canvas.getContext('2d'), strokes, canvas.width, canvas.height);
+            const png = await pdf.embedPng(canvas.toDataURL('image/png'));
+            const x = box.x + (rotation === 90 || rotation === 180 ? box.width : 0);
+            const y = box.y + (rotation === 180 || rotation === 270 ? box.height : 0);
+            page.drawImage(png, { x, y, width, height, rotate: degrees(rotation) });
+            canvas.width = canvas.height = 0;
         }
-        
-        // PDFを保存
-        const fileName = appState.blankMode ? 'whiteboard-note.pdf' : 'pdf-note.pdf';
-        pdf.save(fileName);
-        
-        console.log('✓ PDF保存完了:', fileName);
-        
-        // 元のページに戻る
-        if (appState.currentPage !== originalPage) {
-            appState.currentPage = originalPage;
-            if (appState.blankMode) {
-                renderBlankPage(1122, 793);
-            } else {
-                await renderPage(originalPage);
-            }
-            updatePageInfo();
-        }
-        
-        alert('PDFファイルを保存しました！');
-        
+        const bytes = await pdf.save();
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = snapshot.blankMode ? 'whiteboard-note.pdf' : 'pdf-note.pdf';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (error) {
-        console.error('PDF生成エラー:', error);
-        alert('PDF生成に失敗しました: ' + error.message);
+        console.error(error);
+        alert('PDF保存に失敗しました。暗号化されたPDFは非対応です。書き込みは保持されています。');
+    } finally {
+        appState.exporting = false;
+        elements.savePdfBtn.disabled = false;
     }
 }
 
+
 // 白紙ノートを作成
 async function createBlankCanvas() {
+    if (appState.rendering || !await confirmReplaceNotebook()) return;
     console.log('白紙ノートを作成中...');
     
     // 白紙モードを有効化
@@ -1328,8 +1178,8 @@ async function createBlankCanvas() {
     appState.pdfDoc = null;
     appState.pdfData = null;
     appState.annotations = {};
-    appState.drawingHistory = [];
-    appState.historyStep = -1;
+    appState.histories = {};
+    appState.currentStrokes = [];
     appState.blankPages = [1]; // 最初のページ
     
     // A4サイズのキャンバスを作成（横向き：1122 x 793、96dpi）
@@ -1353,6 +1203,7 @@ async function createBlankCanvas() {
     // ページ追加ボタンを表示
     elements.addPageBtn.style.display = 'flex';
     
+    queueNotebookSave();
     console.log('✓ 白紙ノート作成完了:', width, 'x', height);
 }
 
@@ -1392,6 +1243,7 @@ async function renderBlankPage(width, height) {
 
 // 白紙ページを追加
 async function addBlankPage() {
+    if (appState.rendering || appState.isDrawing) return;
     if (!appState.blankMode) return;
     
     // 現在の注釈を保存
@@ -1410,6 +1262,7 @@ async function addBlankPage() {
     // ページ情報を更新
     updatePageInfo();
     
+    queueNotebookSave();
     console.log('✓ ページを追加:', appState.currentPage, '/', appState.totalPages);
 }
 
@@ -1435,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // イベントリスナーのセットアップ
     setupEventListeners();
+    restoreNotebook();
     
     console.log('アプリケーション初期化完了');
 });
